@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <math.h>
 
+#define MAX_LINE_LENGTH 81
 #define FILE_NAME_LEN 100
 #define AS_OB_EXTENSION_LEN 3
 #define EXT_ENT_EXTENSION_LEN 4
@@ -20,6 +21,7 @@
 #define MIN_21_SIGNED -1048576
 #define MAX_21_UNSIGNED 2097151
 #define MINUS1_6_BITS 63
+#define MAX_MACRO_NAME_LENGTH 20
 
 #define OPCODE_LEN 6
 #define SRC_ADD_LEN 2
@@ -63,6 +65,14 @@ typedef struct node {
     labelTableNodePtr next;
 } labelTableNode;
 
+typedef struct Macro {
+    char name[32];
+    char **lines;
+    int lineCount;
+    struct Macro *next;
+} Macro;
+
+
 typedef union {
     unsigned long index;
     struct {
@@ -75,7 +85,6 @@ typedef union {
         unsigned int opcode:OPCODE_LEN;
     } code;
 } Word;
-
 typedef struct wordnode *wordNodePtr;
 typedef struct wordnode {
     char externLabel[LABEL_LEN];
@@ -92,6 +101,7 @@ typedef struct {
         FILE *file;
         char line[LINE_LEN];
         char label[LABEL_LEN];
+        Macro *macros;
         Bool foundError;
         Status status;
         labelTableNodePtr labelHptr;
