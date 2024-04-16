@@ -8,8 +8,36 @@
 #define MAX_LABEL_LENGTH 32
 #define MAX_LABELS 100
 
+typedef struct macroline {
+    char line[MAX_LINE_LENGTH];
+    struct macroline *next;
+} macroline;
 
-void process_macros(FILE *inputFile, FILE *outputFile);
-void extract_labels(char *filename);
+typedef struct macro {
+    char name[MAX_LINE_LENGTH];
+    macroline *lines;
+    struct macro *nextmacro;
+} macro;
+
+typedef struct label {
+    char name[MAX_LABEL_LENGTH];
+    int address;
+    struct label *next;
+} label;
+
+void printErrors(char *, int, Status);
+int isDuplicateMacroName(char *, macro *);
+int isLabelName(char *, label *);
+void extract_labels(char *, label **);
+void process_macros(FILE *, FILE *, char *, macro **, label *);
+void free_macros(macro *);
+void free_macro_lines(macroline *);
+void free_labels(label *);
+
+
+
+char labels[MAX_LABELS][MAX_LABEL_LENGTH];
+int label_count = 0;
+
 
 #endif
