@@ -3,13 +3,39 @@
 #include <stdlib.h>
 #include "printFunctions.h"
 
+#define MAX_LINE_LENGTH 81
+#define MAX_MACRO_LINES 100
+#define MAX_LABEL_LENGTH 32
+#define MAX_LABELS 100
+
+typedef struct macroline {
+    char line[MAX_LINE_LENGTH];
+    struct macroline *next;
+} macroline;
+
+typedef struct macro {
+    char name[MAX_LINE_LENGTH];
+    macroline *lines;
+    struct macro *nextmacro;
+} macro;
+
+typedef struct label {
+    char name[MAX_LABEL_LENGTH];
+    int address;
+    struct label *next;
+} label;
+
+
+char labels[MAX_LABELS][MAX_LABEL_LENGTH];
+int label_count = 0;
+
 void printErrors(char *filename, int lineCounter, Status status) {
     switch (status) {
         case MacroNameAlreadyExists:
             fprintf(stdout, "%s.as:%d: Macro name already exists.\n", filename, lineCounter);
             break;
         case MacroNameIsLabelName:
-            fprintf(stdout, "%s.as:%d: Macro name is a label name.\n", filename, lineCounter);
+            fprintf(stdout, "%s.as:%d: Macro name cannot be a label.\n", filename, lineCounter);
             break;
         default:
             break;
@@ -85,8 +111,17 @@ void process_macros(FILE *inputFile, FILE *outputFile, char *filename, macro **m
             } else {
                 macroline *newLine = (macroline *)malloc(sizeof(macroline));
                 strcpy(newLine->line, line);
-                newLine->next = currentMacro->lines;
-                currentMacro->lines = newLine;
+                newLine->next = NULL;
+
+                if (currentMacro->lines == NULL) {
+                    currentMacro->lines = newLine;
+                } else {
+                    macroline *lastLine = currentMacro->lines;
+                    while (lastLine->next != NULL) {
+                        lastLine = lastLine->next;
+                    }
+                    lastLine->next = newLine;
+                }
             }
         } else {
             if (strcmp(token, "mcr") == 0) {
