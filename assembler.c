@@ -339,6 +339,12 @@ void parseLine(char *line, char *operand1, char *operand2) {
         }
     }
     
+    token = strtok(NULL, " \t\n");
+    if (token[0] == ':'){
+       errorFound = true;
+       printf("Error: Line %d - ':' must be adjacent to the label.\n", lineNum); 
+    }
+    
     free(lineCopy);
 }
 
