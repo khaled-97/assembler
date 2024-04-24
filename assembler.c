@@ -221,11 +221,31 @@ Bool isIndex(char *operand, SymbolTableEntry *symbolTable) {
 
 
 
-int isLabel(const char *str) {
+int isLabel(char *str) {
+    int i;
     if (str == NULL || *str == '\0') {
         return 0;
     }
-    if (str[strlen(str) - 1] == ':') {
+    if (str[strlen(str) - 1] == ':') { 
+        if (isalpha(str[0]) == 0){ /*label first char is a letter*/
+            errorFound = true;
+            printf("Error: Line %d - label starts with a non alphabetical character.\n", lineNum);
+        }
+        if (strlen(str) > LABEL_LEN + 1){ /*label max length is 31*/
+            errorFound = true;
+            printf("Error: Line %d - label is too long.\n", lineNum);
+        }
+        for (i = 1; i < strlen(str) - 1; i++){ /*label is a sequence of numbers and letters*/
+            if (!isdigit(str[i]) && !isalpha(str[i])){
+                errorFound = true;
+                printf("Error: Line %d - label has a character that isn't a digit or an alphabet.\n", lineNum);
+            }
+        }
+        str[strlen(str) - 1] = '\0';
+        if (isOpcode(str)){
+            errorFound = true;
+            printf("Error: Line %d - a command name can't be a label.\n", lineNum);
+        }
         return 1;
     }
     return 0;
@@ -293,14 +313,6 @@ void parseLine(char *line, char *operand1, char *operand2) {
     }
 
     if (isLabel(token)) {
-        if (isalpha(token[0]) == 0){
-            errorFound = true;
-            printf("Error: Line %d - lable starts with a non alphabetical character.\n", lineNum);
-        }
-        if (strlen(token) > LABEL_LEN + 1){
-            errorFound = true;
-            printf("Error: Line %d - lable is too long.\n", lineNum);
-        }
         /* Get the next token */
         token = strtok(NULL, " \t\n");
     }
