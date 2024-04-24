@@ -17,8 +17,8 @@ void incrementLineCounter(variables *, char *, char *, SymbolTableEntry *);
 void parseLine(char *line, char *operand1, char *operand2);
 char *trim(char *);
 
-
-
+static int lineNum = 0;
+static bool errorFound = false;
 
 int main(int argc, char *argv[]) {
     Macro *macros = NULL;
@@ -51,6 +51,7 @@ int main(int argc, char *argv[]) {
         variablesPtr->labelHptr = NULL;
 
         while(!feof(variablesPtr->file)) {
+            lineNum++;
             char macro_name[MAX_MACRO_NAME_LENGTH];
             statement = getLine(variablesPtr);
 
@@ -292,6 +293,14 @@ void parseLine(char *line, char *operand1, char *operand2) {
     }
 
     if (isLabel(token)) {
+        if (isalpha(token[0]) == 0){
+            errorFound = true;
+            printf("Error: Line %d - lable starts with a non alphabetical character.\n", lineNum);
+        }
+        if (strlen(token) > LABEL_LEN + 1){
+            errorFound = true;
+            printf("Error: Line %d - lable is too long.\n", lineNum);
+        }
         /* Get the next token */
         token = strtok(NULL, " \t\n");
     }
