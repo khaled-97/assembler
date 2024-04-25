@@ -26,16 +26,13 @@ typedef struct label {
 } label;
 
 
-char labels[MAX_LABELS][MAX_LABEL_LENGTH];
-int label_count = 0;
-
-void printErrors(char *filename, int lineCounter, Status status) {
+void printErrors(Status status) {
     switch (status) {
         case MacroNameAlreadyExists:
-            fprintf(stdout, "%s.as:%d: Macro name already exists.\n", filename, lineCounter);
+            fprintf(stdout, "Macro name already exists.\n");
             break;
         case MacroNameIsLabelName:
-            fprintf(stdout, "%s.as:%d: Macro name cannot be a label.\n", filename, lineCounter);
+            fprintf(stdout, "Macro name cannot be a label.\n");
             break;
         default:
             break;
@@ -63,7 +60,7 @@ int isLabelName(char *name, label *labels) {
 }
 
 
-void extract_labels(char *filename, label **labels) {
+void extract_labels(const char *filename, label **labels) {
     char line[81];
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
@@ -90,7 +87,7 @@ void extract_labels(char *filename, label **labels) {
 }
 
 
-void process_macros(FILE *inputFile, FILE *outputFile, char *filename, macro **macros, label *labels) {
+void process_macros(FILE *inputFile, FILE *outputFile,const char *filename, macro **macros, label *labels) {
     char line[MAX_LINE_LENGTH];
     macro *currentMacro = NULL;
     int lineCounter = 0;
@@ -128,11 +125,11 @@ void process_macros(FILE *inputFile, FILE *outputFile, char *filename, macro **m
                 token = strtok(NULL, " \n");
                 if (token != NULL) {
                     if (isDuplicateMacroName(token, *macros)) {
-                        printErrors(filename, lineCounter, MacroNameAlreadyExists);
+                        printErrors(MacroNameAlreadyExists);
                         return;
                     }
                     if (isLabelName(token, labels)) {
-                        printErrors(filename, lineCounter, MacroNameIsLabelName);
+                        printErrors(MacroNameIsLabelName);
                         return;
                     }
                     macro *newMacro = (macro *)malloc(sizeof(macro));
@@ -192,38 +189,46 @@ void free_labels(label *labels) {
 
 
 
-int main() {
-    int i;
-    FILE *as_file = fopen("ps.as", "r");
+void process_file(const char *filename) {
+    FILE *as_file = fopen(filename, "r");
     if (as_file == NULL) {
-        printf("Could not open file ps.as\n");
-        return 1;
+        printf("Could not open file %s\n", filename);
+        return;
     }
 
     label *labels = NULL;
-    extract_labels("ps.as", &labels); /* Extract labels from .as file */
-    /* Print labels */
+    extract_labels(filename, &labels);
+
     label *l;
     for (l = labels; l != NULL; l = l->next) {
         printf("%s\n", l->name);
     }
 
-    FILE *am_file = fopen("ps.am", "w");
+    char am_filename[256];
+    sprintf(am_filename, "%s.am", filename);
+    FILE *am_file = fopen(am_filename, "w");
     if (am_file == NULL) {
-        printf("Could not open file ps.am\n");
-        fclose(as_file); /* Close as_file before returning */
-        return 1;
+        printf("Could not open file %s\n", am_filename);
+        fclose(as_file);
+        return;
     }
 
     macro *macros = NULL;
-    process_macros(as_file, am_file, "ps.as", &macros, labels); /* Process macros and output to .am file */
-    fclose(as_file); /* Close as_file after it's no longer needed */
-
+    process_macros(as_file, am_file, filename, &macros, labels);
+    fclose(as_file);
 
     fclose(am_file);
-    free_labels(labels); /* Free labels */
-    free_macros(macros); /* Free macros */
+    free_labels(labels);
+    free_macros(macros);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Usage: %s <ps>\n", argv[0]);
+        return 1;
+    }
+
+    process_file(argv[1]);
 
     return 0;
 }
-
