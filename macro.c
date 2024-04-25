@@ -2,29 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "printFunctions.h"
-
-#define MAX_LINE_LENGTH 81
-#define MAX_MACRO_LINES 100
-#define MAX_LABEL_LENGTH 32
-#define MAX_LABELS 100
-
-typedef struct macroline {
-    char line[MAX_LINE_LENGTH];
-    struct macroline *next;
-} macroline;
-
-typedef struct macro {
-    char name[MAX_LINE_LENGTH];
-    macroline *lines;
-    struct macro *nextmacro;
-} macro;
-
-typedef struct label {
-    char name[MAX_LABEL_LENGTH];
-    int address;
-    struct label *next;
-} label;
-
+#include "preProcessor.h"
 
 void printErrors(Status status) {
     switch (status) {
