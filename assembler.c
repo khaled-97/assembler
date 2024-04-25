@@ -2,9 +2,9 @@
 #include "firstPass.h"
 #include "secondPass.h"
 #include "debug.h"
+#include "macro.h"
 #include <string.h>
 
-Bool processMacro(char *, variables *, Macro **);
 void freeVars(variables*);
 void addSymbol(SymbolTableEntry**, const char*, int, int, Bool);
 void printSymbolTable(SymbolTableEntry *);
@@ -12,19 +12,20 @@ Bool isOpcode(char *);
 Bool isRegister(char *);
 Bool isDefinedVariable(char *, SymbolTableEntry *);
 Bool isNumber(char *);
-Bool isIndex(char *, SymbolTableEntry *);
-void incrementLineCounter(variables *, char *, char *, SymbolTableEntry *);
-void parseLine(char *line, char *operand1, char *operand2);
+Bool isIndex(char *, label *, SymbolTableEntry *);
+Bool isLabel(const char *, label *);
+void incrementLineCounter(variables *, char *, char *, SymbolTableEntry *, label *);
+void parseLine(char *, char *, char *, label *);
 char *trim(char *);
 
 
-
-
 int main(int argc, char *argv[]) {
-    Macro *macros = NULL;
     char* label;
     int i;
     SymbolTableEntry *symbolTable = NULL;
+
+    process_file(argv[1]);
+    
     for(i=1;i<argc;i++) {
         Statement statement;
         variables *variablesPtr;
@@ -60,9 +61,9 @@ int main(int argc, char *argv[]) {
             printf("lineCounter is %d\n", variablesPtr->lineCounter);
 
             /* Parse the line to extract the operands */
-            parseLine(variablesPtr->line, operand1, operand2);
+            parseLine(variablesPtr->line, operand1, operand2, variablesPtr->labelHptr);
             /* Check the type of operands and increment the line counter accordingly */
-            incrementLineCounter(variablesPtr, operand1, operand2, symbolTable);
+            incrementLineCounter(variablesPtr, operand1, operand2, symbolTable, variablesPtr->labelHptr);
             if(statement == Comment) {
                 continue;
             }
@@ -87,31 +88,6 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-Bool processMacro(char *line, variables *variablesPtr, Macro **macros) {
-    if (strncmp(line, "mcr", 3) == 0) { 
-        /* Start of a macro definition */
-        Macro *macro = malloc(sizeof(Macro));
-        sscanf(line, "mcr %s", macro->name);
-        macro->lines = NULL;
-        macro->lineCount = 0;
-        macro->next = *macros;
-        *macros = macro;
-        return True;
-    } else if (strncmp(line, "endmcr", 6) == 0) {
-        /* End of a macro definition */
-        *macros = NULL;
-        return True;
-    } else if (*macros != NULL) {
-        /* Inside a macro definition */
-        (*macros)->lines = realloc((*macros)->lines, sizeof(char *) * ((*macros)->lineCount + 1));
-        (*macros)->lines[(*macros)->lineCount] = strdup(line);
-        (*macros)->lineCount++;
-        return True;
-    } else {
-        /* Not inside a macro definition or invocation */
-        return False;
-    }
-}
 
 
 void freeVars(variables *variablesPtr) {
@@ -171,6 +147,7 @@ Bool isRegister(char *operand) {
 /* Check if the operand is a defined variable */
 Bool isDefinedVariable(char *operand, SymbolTableEntry *symbolTable) {
     SymbolTableEntry *entry = symbolTable;
+    printf("Checking if '%s' is a defined variable\n", operand);
     while (entry != NULL) {
         if (strcmp(entry->symbol, operand) == 0 && !entry->isLabel) {
             return True;
@@ -182,6 +159,7 @@ Bool isDefinedVariable(char *operand, SymbolTableEntry *symbolTable) {
 
 /* Check if the operand is a number */
 Bool isNumber(char *operand) {
+    printf("Checking if '%s' is a number\n", operand);
     if (operand[0] == '#') {
         return True;
     }
@@ -189,52 +167,52 @@ Bool isNumber(char *operand) {
 }
 
 /* Check if the operand is an index */
-Bool isIndex(char *operand, SymbolTableEntry *symbolTable) {
+Bool isIndex(char *operand, label *labels, SymbolTableEntry *symbolTable) {
     printf("Checking if '%s' is an index\n", operand);
-
     char *bracket = strchr(operand, '[');
     if (bracket != NULL && operand[strlen(operand) - 1] == ']') {
-        /* Extract the name inside the brackets */
-        char name[MAX_MACRO_NAME_LENGTH];
+        /* Extract the name and the index inside the brackets */
+        char name[MAX_LABEL_LENGTH];
+        char index[MAX_LABEL_LENGTH];
         strncpy(name, operand, bracket - operand);
         name[bracket - operand] = '\0';
-
-        printf("Extracted name: '%s'\n", name);
+        strncpy(index, bracket + 1, strlen(operand) - (bracket - operand) - 2);
+        index[strlen(operand) - (bracket - operand) - 2] = '\0';
 
         /* Check if the name is a valid label */
-        SymbolTableEntry *entry = symbolTable;
-        while (entry != NULL) {
-            printf("Checking against symbol '%s' with isLabel=%d\n", entry->symbol, entry->isLabel);
-            if (strcmp(entry->symbol, name) == 0 && entry->isLabel) {
-                printf("'%s' is an index\n", operand);
+        if (isLabel(name, labels)) {
+            /* Check if the index is a number or a defined variable */
+            if (isNumber(index) || isDefinedVariable(index, symbolTable)) {
                 return True;
             }
-            entry = entry->next;
         }
     }
-
-    printf("'%s' is not an index\n", operand);
     return False;
 }
 
 
 
 
-int isLabel(const char *str) {
-    if (str == NULL || *str == '\0') {
-        return 0;
+
+Bool isLabel(const char *str, label *labels) {
+    printf("Checking if '%s' is a label\n", str);
+    label *l;
+    for (l = labels; l != NULL; l = l->next) {
+        if (strcmp(str, l->name) == 0) {
+            return True;
+        }
     }
-    if (str[strlen(str) - 1] == ':') {
-        return 1;
-    }
-    return 0;
+    return False;
 }
 
 
+
 /* Increment the line counter based on the type of operands */
-void incrementLineCounter(variables *variablesPtr, char *operand1, char *operand2, SymbolTableEntry *symbolTable) {
+void incrementLineCounter(variables *variablesPtr, char *operand1, char *operand2, SymbolTableEntry *symbolTable, label *labels) {
     operand1 = trim(operand1);
     operand2 = trim(operand2);
+    printf("Incrementing line counter for '%s' and '%s'\n", operand1, operand2);
+    printf("Line counter is %d\n", variablesPtr->lineCounter);
 
     /* Ignore comments and .define lines */
     if (variablesPtr->line[0] == '.' || variablesPtr->line[0] == ';') {
@@ -245,27 +223,23 @@ void incrementLineCounter(variables *variablesPtr, char *operand1, char *operand
     if (isRegister(operand1) && isRegister(operand2)) {
         variablesPtr->lineCounter += 2;  /* +1 for the line itself and +1 for the two register operands */
     } 
-    /* If the operand is a register, a number, or a defined variable */
-    else if (isRegister(operand1) || isNumber(operand1) || isDefinedVariable(operand1, symbolTable)) {
+    /* If the operand is a register, a number, a defined variable, or a label */
+    else if (isRegister(operand1) || isNumber(operand1) || isDefinedVariable(operand1, symbolTable) || isLabel(operand1, labels)) {
         variablesPtr->lineCounter += 2;  /* +1 for the line itself and +1 for the operand */
     } 
     /* If the operand is an index */
-    else if (isIndex(operand1, symbolTable)) {
+    else if (isIndex(operand1, labels, symbolTable)) {
         variablesPtr->lineCounter += 3;  /* +1 for the line itself and +2 for the index operand */
     }
 
     /* If there's a second operand */
     if (operand2[0] != '\0') {
-        /* If the second operand is a register */
-        if (isRegister(operand2)) {
-            variablesPtr->lineCounter++;  /* +1 for the register operand */
-        } 
-        /* If the second operand is a number or a defined variable */
-        else if (isNumber(operand2) || isDefinedVariable(operand2, symbolTable)) {
+        /* If the second operand is a register, a number, a defined variable, or a label */
+        if (isRegister(operand2) || isNumber(operand2) || isDefinedVariable(operand2, symbolTable) || isLabel(operand2, labels)) {
             variablesPtr->lineCounter++;  /* +1 for the operand */
         } 
         /* If the second operand is an index */
-        else if (isIndex(operand2, symbolTable)) {
+        else if (isIndex(operand2, labels, symbolTable)) {
             variablesPtr->lineCounter += 2;  /* +2 for the index operand */
         }
     }
@@ -274,7 +248,11 @@ void incrementLineCounter(variables *variablesPtr, char *operand1, char *operand
 
 
 
-void parseLine(char *line, char *operand1, char *operand2) {
+
+void parseLine(char *line, char *operand1, char *operand2, label *labels) {
+    printf("Parsing line: '%s'\n", line);
+    printf("Operand1: '%s'\n", operand1);
+    printf("Operand2: '%s'\n", operand2);
     char *token;
     char *lineCopy = malloc(strlen(line) + 1);
     if (lineCopy == NULL) {
@@ -291,7 +269,7 @@ void parseLine(char *line, char *operand1, char *operand2) {
         return;
     }
 
-    if (isLabel(token)) {
+    if (isLabel(token, labels)) {  /* Pass labels to isLabel */
         /* Get the next token */
         token = strtok(NULL, " \t\n");
     }
@@ -320,6 +298,7 @@ void parseLine(char *line, char *operand1, char *operand2) {
     
     free(lineCopy);
 }
+
 
 
 char *trim(char *str) {
