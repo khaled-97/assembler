@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "printFunctions.h"
-#include "preProcessor.h"
+#include "macro.h"
 
 void printErrors(Status status) {
     switch (status) {
