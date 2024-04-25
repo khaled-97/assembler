@@ -177,13 +177,11 @@ void process_file(const char *filename) {
     label *labels = NULL;
     extract_labels(filename, &labels);
 
-    label *l;
-    for (l = labels; l != NULL; l = l->next) {
-        printf("%s\n", l->name);
-    }
-
     char am_filename[256];
-    sprintf(am_filename, "%s.am", filename);
+    strncpy(am_filename, filename, strlen(filename) - 3);
+    am_filename[strlen(filename) - 3] = '\0'; 
+    strcat(am_filename, ".am");
+
     FILE *am_file = fopen(am_filename, "w");
     if (am_file == NULL) {
         printf("Could not open file %s\n", am_filename);
